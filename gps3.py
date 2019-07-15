@@ -1,3 +1,4 @@
+
 #! /usr/bin/python3.6
 import sys
 import socket
@@ -7,6 +8,7 @@ import curses
 from datetime import datetime, timedelta
 import subprocess
 import re
+import ipaddress
 
 ##################################################################
 # If you are reading this than what are you doing with your life #
@@ -14,19 +16,22 @@ import re
 # Relays UDP data to a specified list of IP addresses            #
 # Developed for linux only, must be run from a terminal          #
 # About 5 lines to do the job, 265 to print crap to terminal     #
+#                                                                #
+# see sample.conf for the file lines format.                     #
 ##################################################################
 
 # Global Variables
 # Blank IP List
 dest_ip_list = []
 # IP address and port to listen for UDP packets
-source_ip = '10.20.23.230'
+source_ip = '192.168.20.69'
 source_port = 5019
 # Local IP address and port to bind to
-binding_ip = '10.20.64.253'
+binding_ip = '10.239.29.162'
+binding_ip = "192.168.20.81"
 dest_port = 5019
 # File with the list of IP addresses
-ip_list = '/home/minesys/Desktop/final.conf'
+ip_list = 'sample.conf'
 
 # Statistics
 transmit_ok = 0
@@ -52,6 +57,7 @@ netstat = ''
 def ipList():
     '''
     Parse ip_list file and append to dest_ip_list array
+    Room here to use the ipaddress module to do network ranges.
     Ignore lines starting with #
     '''
     with open(ip_list, 'r') as f:
@@ -59,10 +65,14 @@ def ipList():
             if line[0] == '#':
                 continue
             else:
-                stripped_line = line.strip('\n')
-                split_line = stripped_line.split(':')
-                dest_ip = split_line[1].split('/')[0]
-                dest_ip_list.append(dest_ip)
+                # Strip everything - not just newline
+                stripped_line = line.strip()
+                if ipaddress.ip_address(stripped_line):
+                    dest_ip_list.append(stripped_line)
+                else:
+                    split_line = stripped_line.split(':')
+                    dest_ip = split_line[1].split('/')[0]
+                    dest_ip_list.append(dest_ip)
 
 
 def send(ip, data, s):
@@ -107,15 +117,15 @@ def getBuffer():
     Returns the system udp tx buffer
     '''
     # Do a netstat command
-    out = subprocess.Popen(['netstat', '-a'], stdout=subprocess.PIPE)
+    out = subprocess.Popen(['netstat', '-an'], stdout=subprocess.PIPE)
     stdout,stderr = out.communicate()
     decoded = stdout.decode("utf-8").split('\n')
     # Get line with port 5019
     for line in decoded:
-        if 'localhost.localdom:5019' in line:
+        if 'UDP' and ':5019' in line:
             splitline = line.split()
             port_active = True
-            return(splitline)
+            return(['udp', 0, 0])
         else:
             port_active = False
     # Handle when port is not active
@@ -134,7 +144,7 @@ class display():
         curses.use_default_colors()
         curses.curs_set(0)
         curses.init_pair(1, curses.COLOR_RED, -1)
-        self.ascii_art = asciiArt()
+        #self.ascii_art = asciiArt()
 
 
     def screen(self):
@@ -157,7 +167,7 @@ class display():
         self.box7 = curses.newwin(4, 28, 9, 57) # Bottom right (buffer)
         self.box8 = curses.newwin(3, 28, 1, 1) # Top Left (warning)
         self.box9 = curses.newwin(3, 28, 1, 57) # Top Right (delay)
-        self.box10 = curses.newwin(20, 44, 13, 20) # Bottom (ascii art)
+        #self.box10 = curses.newwin(20, 44, 13, 20) # Bottom (ascii art)
 
         # Create boarder box's
         self.box1.box()
@@ -169,7 +179,7 @@ class display():
         self.box7.box()
         self.box8.box()
         self.box9.box()
-        self.box10.box()
+        #self.box10.box()
 
         # Titles of the windows
         self.box1.addstr(0,11,"Uptime")
@@ -181,7 +191,7 @@ class display():
         self.box7.addstr(0,11,"Buffer")
         self.box8.addstr(0,10,"Warning")
         self.box9.addstr(0,12,"Delay")
-        self.box10.addstr(0,17,"A Satellite")
+        #self.box10.addstr(0,17,"A Satellite")
 
         # Contents of each window
         self.box1.addstr(1,1,' '*26)
@@ -199,7 +209,7 @@ class display():
         self.box4.addstr(2,1,'    Fail: {}'.format(send_errors))
         self.box4.addstr(3,1,' Percent: {}%'.format(send_perc))
 
-        self.box5.addstr(1,1,'    File: final.conf')
+        self.box5.addstr(1,1,'    File: {}'.format(ip_list))
         self.box5.addstr(2,1,'     IPs: {}'.format(len(dest_ip_list)))
 
         self.box6.addstr(1,1,'  Local:{}:{}'.format(binding_ip, dest_port))
@@ -215,8 +225,8 @@ class display():
         self.box9.addstr(1,1,str(delay).center(26, ' '))
 
         # Ascii window
-        for y, line in enumerate(self.ascii_art.splitlines(), 2):
-            self.box10.addstr(y, 2, line)
+        #for y, line in enumerate(self.ascii_art.splitlines(), 2):
+        #    self.box10.addstr(y, 2, line)
         
         # Refresh whole screen and each window
         self.stdscr.refresh()
@@ -229,7 +239,7 @@ class display():
         self.box7.refresh()
         self.box8.refresh()
         self.box9.refresh()
-        self.box10.refresh()
+        #self.box10.refresh()
 
 
 def asciiArt():
