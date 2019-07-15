@@ -13,12 +13,13 @@ Designed to be a python drop in replacement for [samplicator](https://github.com
 Linux only
 
 ### IP List File Format
-(Default final.conf)
+(Default sample.conf)
 {source IP}:{Destination IP}/{port}
 Example:
 10.20.23.230:10.20.66.109/5019
 
 Omits any lines beginning with #
+Port is currently excluded - 'set on start' not per IP
 
 This is based on the original samplicator file format
 
