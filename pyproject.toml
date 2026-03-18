@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "incorrections"
+version = "0.2.0"
+description = "Threaded UDP relay for CMR+ GPS corrections"
+requires-python = ">=3.6"
+dependencies = [
+    "psutil>=5.9",
+]
+
+[project.scripts]
+incorrections = "gps3:main"
