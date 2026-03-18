@@ -4,54 +4,57 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**incorrections** — A threaded UDP relay for CMR+ GPS corrections data. Python drop-in replacement for [samplicator](https://github.com/sleinen/samplicator).
+**incorrections** — An async UDP relay for CMR+ GPS corrections data. Replacement for [samplicator](https://github.com/sleinen/samplicator).
 
-Listens on a UDP port for packets from a configured source IP, then fans out the data to a list of destination IPs using threads.
+Listens on a UDP port for packets from a configured source IP, then fans out the data to a list of destination IPs. Written in Rust with tokio async runtime. Legacy Python version (`gps3.py`) is retained.
 
-## Build & Install
+## Build & Test (Rust)
 
 ```bash
-pip install -e .          # editable install (pulls psutil)
-pip install .             # regular install
-incorrections             # run via entry point
+cargo build                    # debug build
+cargo build --release          # release build
+cargo test                     # run all unit tests
+cargo test config              # run tests in config module
+cargo test stats               # run tests in stats module
+cargo test relay               # run tests in relay module (integration)
 ```
 
 ## Running
 
 ```bash
-# Interactive mode (curses TUI, Linux only)
-python gps3.py --bind-ip 10.0.0.1 --source-ip 10.0.0.2
-
 # Non-interactive mode (log keepalive stats every 5 min)
-python gps3.py --no-interactive --interval 300
+cargo run -- --no-interactive --bind-ip 10.0.0.1 --source-ip 10.0.0.2
 
-# All options
-python gps3.py --source-ip IP --source-port PORT --bind-ip IP --dest-port PORT --conf FILE --no-interactive --interval SECS
-
-# Send a test packet to localhost:5019
-python fake-udp-packet.py
+# All CLI options
+incorrections --source-ip IP --listen-port PORT --bind-ip IP --dest-port PORT --conf FILE --no-interactive --interval SECS
 ```
 
-## Tests
+## Legacy Python
 
 ```bash
-python -m pytest test_gps3.py -v       # all tests
-python -m pytest test_gps3.py -k uptime # single test class/pattern
+pip install -e .               # install with psutil dep
+python gps3.py --no-interactive --bind-ip 10.0.0.1 --source-ip 10.0.0.2
+python -m pytest test_gps3.py -v
 ```
 
-## Dependencies
+## Architecture (Rust)
 
-Managed in `pyproject.toml`. Runtime: `psutil>=5.9`. Dev: `pytest`.
+```
+src/
+  main.rs    — Entry point: CLI parsing, socket setup, startup banner
+  config.rs  — Args struct (clap derive), parse_ip_list() config parser
+  stats.rs   — Stats struct, calc_percent(), format_uptime()
+  relay.rs   — run_relay() async loop: receive, filter, fan-out, stats printing
+```
 
-## Architecture
+- **Async I/O**: tokio runtime with `UdpSocket::recv_from` / `send_to`, timeout via `tokio::time::timeout`
+- **Source filtering**: Only forwards packets from `--source-ip`, silently drops others
+- **Stats output**: Non-interactive mode prints a keepalive line every `--interval` seconds
+- **No curses TUI in Rust version** — non-interactive log mode only
 
-Single-file application (`gps3.py`):
+## Dependencies (Rust)
 
-- **CLI** (`parse_args()`): argparse-based, all config via flags (source IP, bind IP, ports, conf file, interactive/log mode).
-- **IP parsing** (`parse_ip_list()`): Reads conf file, returns list. Supports plain IPs and samplicator `source:dest/port` format.
-- **UDP relay loop** (`main()`): Binds socket, receives packets, filters by source IP, fans out via `ThreadPool`.
-- **Display modes**: `CursesDisplay` (interactive TUI) or `LogDisplay` (non-interactive, prints stats line every N seconds). Selected via `--no-interactive`.
-- **Buffer stats** (`get_buffer()`): Uses `psutil.net_connections()` + `psutil.net_io_counters()` for cross-platform network stats.
+Managed in `Cargo.toml`: `tokio` (async runtime + UDP), `clap` (CLI), `chrono` (timestamps).
 
 ## Config File Format (`sample.conf`)
 

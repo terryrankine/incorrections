@@ -1,0 +1,11 @@
+[package]
+name = "incorrections"
+version = "0.2.0"
+edition = "2021"
+description = "Threaded UDP relay for CMR+ GPS corrections"
+license = "MIT"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "time", "signal", "sync"] }
+clap = { version = "4", features = ["derive"] }
+chrono = "0.4"
